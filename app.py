@@ -37,19 +37,23 @@ model, mlb, le = load_resources()
 # 🧠 Helper Function
 # ==============================
 def predict_disease(symptoms):
-    """Return top 5 predicted diseases given a list of symptoms"""
+    """Return top 5 predicted diseases with confidence percentages."""
     user_input = mlb.transform([symptoms])
     distances, indices = model.kneighbors(user_input, n_neighbors=5)
     neighbor_labels = model._y[indices[0]]
 
-    # Calculate weighted scores for each disease
+    # Weighted scores based on inverse distance
     scores = {}
     for label, dist in zip(neighbor_labels, distances[0]):
         disease = le.inverse_transform([label])[0]
         scores[disease] = scores.get(disease, 0) + (1 / (dist + 1e-5))
 
+    # Sort and convert to confidence percentages
     sorted_diseases = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-    return sorted_diseases[:5]
+    total_score = sum(score for _, score in sorted_diseases)
+    percent_results = [(disease, (score / total_score) * 100) for disease, score in sorted_diseases]
+
+    return percent_results[:5]
 
 # ==============================
 # 🧬 UI Design
@@ -59,7 +63,7 @@ st.markdown(
     <div style='text-align:center;'>
         <h1 style='color:#0099cc;'>🧬 AI Disease Prediction</h1>
         <p style='color:gray; font-size:18px;'>
-        Enter the symptoms you are experiencing and discover the top possible diseases predicted using a Weighted KNN model.
+        Select your symptoms and discover the top possible diseases predicted by a Weighted KNN model.
         </p>
     </div>
     """, unsafe_allow_html=True
@@ -83,8 +87,7 @@ if st.button("🔍 Predict Disease"):
             """, unsafe_allow_html=True
         )
 
-        # Display results in beautiful cards
-        for i, (disease, score) in enumerate(results, start=1):
+        for i, (disease, confidence) in enumerate(results, start=1):
             st.markdown(
                 f"""
                 <div style='background-color:#f0f9f9;
@@ -93,7 +96,7 @@ if st.button("🔍 Predict Disease"):
                             margin-bottom:10px;
                             box-shadow:0 2px 4px rgba(0,0,0,0.1);'>
                     <h4 style='color:#004d4d; margin:0;'>{i}. {disease}</h4>
-                    <p style='color:#007777; margin:0;'>Score: {score:.2f}</p>
+                    <p style='color:#007777; margin:0;'>Confidence: {confidence:.1f}%</p>
                 </div>
                 """, unsafe_allow_html=True
             )
