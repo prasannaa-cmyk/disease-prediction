@@ -1,6 +1,8 @@
 import streamlit as st
 import joblib
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -58,7 +60,7 @@ def predict_diseases(symptoms):
         return []
 
     input_vector = symptom_encoder.transform([symptoms])
-    distances, indices = model.kneighbors(input_vector, n_neighbors=5, return_distance=True)
+    distances, indices = model.kneighbors(input_vector, n_neighbors=10, return_distance=True)
 
     diseases = np.array(model._y)[indices[0]]
     distances = distances[0]
@@ -68,9 +70,10 @@ def predict_diseases(symptoms):
     disease_scores = {}
 
     for dis, w in zip(diseases, weights):
-        dis_name = disease_encoder.inverse_transform([dis])[0]  # decode numeric label
+        dis_name = disease_encoder.inverse_transform([dis])[0]
         disease_scores[dis_name] = disease_scores.get(dis_name, 0) + w
 
+    # Top 5 unique diseases
     sorted_diseases = sorted(disease_scores.items(), key=lambda x: x[1], reverse=True)[:5]
     return sorted_diseases
 
@@ -86,11 +89,23 @@ if st.button("🔍 Predict Disease"):
 
         if results:
             st.success("✅ Prediction Complete! Here are the top 5 possible diseases:")
+
+            # Display results with visible text
             for i, (disease, score) in enumerate(results, start=1):
                 st.markdown(f"""
                     <div style='background-color:#f0f9f9;padding:10px;border-radius:10px;margin:8px 0;'>
-                        <b>{i}. {disease}</b> — <span style='color:gray;'>Score: {score:.2f}</span>
+                        <b style='color:black;'>{i}. {disease}</b> — <span style='color:gray;'>Score: {score:.2f}</span>
                     </div>
                 """, unsafe_allow_html=True)
+
+            # Horizontal bar chart
+            df_results = pd.DataFrame(results, columns=['Disease', 'Score'])
+            df_results = df_results[::-1]  # reverse for better display
+            fig, ax = plt.subplots(figsize=(7,4))
+            ax.barh(df_results['Disease'], df_results['Score'], color='#3EB489')
+            ax.set_xlabel("Weighted Score")
+            ax.set_title("Top 5 Predicted Diseases")
+            st.pyplot(fig)
+
         else:
             st.error("❌ No matching diseases found. Try adding more symptoms.")
