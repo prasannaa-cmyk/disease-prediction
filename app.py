@@ -101,8 +101,6 @@ if st.button("🔍 Predict Disease"):
                 """, unsafe_allow_html=True
             )
 
-        st.balloons()
-
 else:
     st.info("👆 Select symptoms and click **Predict Disease** to begin.")
 
