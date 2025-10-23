@@ -6,7 +6,7 @@ import numpy as np
 # 🎨 PAGE CONFIGURATION
 # ==========================
 st.set_page_config(
-    page_title="AI Disease Predictor 🤖",
+    page_title="Disease Predictor 🤖",
     page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -57,23 +57,21 @@ def predict_diseases(symptoms):
         return []
 
     input_vector = encoder.transform([symptoms])
-    distances, indices = model.kneighbors(input_vector, n_neighbors=5)
-    
-    # Get top 5 nearest neighbors’ diseases
-    neighbor_diseases = model.predict(input_vector.reshape(1, -1))
-    probs = model.predict_proba(input_vector)
-    
-    # Estimate probabilities by summing inverse distances
-    neighbors = model.kneighbors(input_vector, return_distance=True)
-    distances = neighbors[0][0]
-    indices = neighbors[1][0]
-    
-    diseases = np.array(model._y)[indices]
+    neighbors = model.kneighbors(input_vector, n_neighbors=5, return_distance=True)
+    distances, indices = neighbors
+
+    diseases = np.array(model._y)[indices[0]]
+    distances = distances[0]
+
+    # Compute weights based on inverse distances
     weights = 1 / (distances + 1e-5)
-    unique, probs = np.unique(diseases, return_counts=True)
-    disease_scores = dict(zip(unique, probs * weights[:len(unique)]))
-    
-    # Sort top 5
+    disease_scores = {}
+
+    for dis, w in zip(diseases, weights):
+        dis = str(dis)  # Convert to string for safety
+        disease_scores[dis] = disease_scores.get(dis, 0) + w
+
+    # Sort by score (top 5)
     sorted_diseases = sorted(disease_scores.items(), key=lambda x: x[1], reverse=True)[:5]
     return sorted_diseases
 
