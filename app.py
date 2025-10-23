@@ -1,111 +1,108 @@
 import streamlit as st
-import joblib
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import warnings
-warnings.filterwarnings("ignore")
+import joblib
 
-# ==========================
-# PAGE CONFIG
-# ==========================
+# ==============================
+# 🎨 Page Configuration
+# ==============================
 st.set_page_config(
-    page_title="AI Disease Predictor 🤖",
-    page_icon="🩺",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="AI Disease Predictor",
+    page_icon="🧬",
+    layout="centered",
 )
 
-# ==========================
-# LOAD MODEL & ENCODERS
-# ==========================
+# Hide Streamlit default footer & menu
+hide_st_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_st_style, unsafe_allow_html=True)
+
+# ==============================
+# 💾 Load Model and Encoders
+# ==============================
 @st.cache_resource
-def load_model():
+def load_resources():
     model = joblib.load("weighted_knn_disease_model.pkl")
-    symptom_encoder = joblib.load("symptom_encoder.pkl")
-    disease_encoder = joblib.load("disease_label_encoder.pkl")
-    return model, symptom_encoder, disease_encoder
+    mlb = joblib.load("symptom_encoder.pkl")
+    le = joblib.load("disease_label_encoder.pkl")
+    return model, mlb, le
 
-model, symptom_encoder, disease_encoder = load_model()
+model, mlb, le = load_resources()
 
-# ==========================
-# PAGE TITLE
-# ==========================
-st.markdown("""
-    <h1 style='text-align: center; color: #3EB489;'>
-        🧠 Intelligent Disease Prediction System
-    </h1>
-    <h4 style='text-align: center; color: gray;'>
-        Enter your symptoms below to get the top 5 possible diseases.
-    </h4>
-    <hr style='border: 1px solid #3EB489;'>
-""", unsafe_allow_html=True)
+# ==============================
+# 🧠 Helper Function
+# ==============================
+def predict_disease(symptoms):
+    """Return top 5 predicted diseases given a list of symptoms"""
+    user_input = mlb.transform([symptoms])
+    distances, indices = model.kneighbors(user_input, n_neighbors=5)
+    neighbor_labels = model._y[indices[0]]
 
-# ==========================
-# USER INPUT
-# ==========================
-all_symptoms = list(symptom_encoder.classes_)
-st.markdown("### 🩺 Select or type your symptoms:")
-selected_symptoms = st.multiselect(
-    "Start typing to search symptoms...",
-    options=all_symptoms,
-    help="Choose one or more symptoms from the list."
+    # Calculate weighted scores for each disease
+    scores = {}
+    for label, dist in zip(neighbor_labels, distances[0]):
+        disease = le.inverse_transform([label])[0]
+        scores[disease] = scores.get(disease, 0) + (1 / (dist + 1e-5))
+
+    sorted_diseases = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return sorted_diseases[:5]
+
+# ==============================
+# 🧬 UI Design
+# ==============================
+st.markdown(
+    """
+    <div style='text-align:center;'>
+        <h1 style='color:#0099cc;'>🧬 AI Disease Prediction</h1>
+        <p style='color:gray; font-size:18px;'>
+        Enter the symptoms you are experiencing and discover the top possible diseases predicted using a Weighted KNN model.
+        </p>
+    </div>
+    """, unsafe_allow_html=True
 )
 
-# ==========================
-# PREDICTION FUNCTION
-# ==========================
-def predict_diseases(symptoms):
-    if not symptoms:
-        return []
+all_symptoms = sorted(list(mlb.classes_))
+selected_symptoms = st.multiselect("Select your symptoms:", all_symptoms)
 
-    input_vector = symptom_encoder.transform([symptoms])
-    distances, indices = model.kneighbors(input_vector, n_neighbors=10, return_distance=True)
-
-    diseases = np.array(model._y)[indices[0]]
-    distances = distances[0]
-
-    # Weight by inverse distance
-    weights = 1 / (distances + 1e-5)
-    disease_scores = {}
-
-    for dis, w in zip(diseases, weights):
-        dis_name = disease_encoder.inverse_transform([dis])[0]
-        disease_scores[dis_name] = disease_scores.get(dis_name, 0) + w
-
-    # Top 5 unique diseases
-    sorted_diseases = sorted(disease_scores.items(), key=lambda x: x[1], reverse=True)[:5]
-    return sorted_diseases
-
-# ==========================
-# PREDICT BUTTON
-# ==========================
 if st.button("🔍 Predict Disease"):
     if not selected_symptoms:
-        st.warning("⚠️ Please select at least one symptom.")
+        st.warning("⚠️ Please select at least one symptom to proceed.")
     else:
-        with st.spinner("Analyzing symptoms..."):
-            results = predict_diseases(selected_symptoms)
+        results = predict_disease(selected_symptoms)
 
-        if results:
-            st.success("✅ Prediction Complete! Here are the top 5 possible diseases:")
+        st.markdown(
+            """
+            <div style='margin-top:30px;'>
+                <h3 style='color:#006666;'>✅ Prediction Complete!</h3>
+                <p style='color:gray;'>Here are the top 5 possible diseases based on your symptoms:</p>
+            </div>
+            """, unsafe_allow_html=True
+        )
 
-            # Display results with visible text
-            for i, (disease, score) in enumerate(results, start=1):
-                st.markdown(f"""
-                    <div style='background-color:#f0f9f9;padding:10px;border-radius:10px;margin:8px 0;'>
-                        <b style='color:black;'>{i}. {disease}</b> — <span style='color:gray;'>Score: {score:.2f}</span>
-                    </div>
-                """, unsafe_allow_html=True)
+        # Display results in beautiful cards
+        for i, (disease, score) in enumerate(results, start=1):
+            st.markdown(
+                f"""
+                <div style='background-color:#f0f9f9;
+                            border-radius:10px;
+                            padding:15px;
+                            margin-bottom:10px;
+                            box-shadow:0 2px 4px rgba(0,0,0,0.1);'>
+                    <h4 style='color:#004d4d; margin:0;'>{i}. {disease}</h4>
+                    <p style='color:#007777; margin:0;'>Score: {score:.2f}</p>
+                </div>
+                """, unsafe_allow_html=True
+            )
 
-            # Horizontal bar chart
-            df_results = pd.DataFrame(results, columns=['Disease', 'Score'])
-            df_results = df_results[::-1]  # reverse for better display
-            fig, ax = plt.subplots(figsize=(7,4))
-            ax.barh(df_results['Disease'], df_results['Score'], color='#3EB489')
-            ax.set_xlabel("Weighted Score")
-            ax.set_title("Top 5 Predicted Diseases")
-            st.pyplot(fig)
+        st.balloons()
 
-        else:
-            st.error("❌ No matching diseases found. Try adding more symptoms.")
+else:
+    st.info("👆 Select symptoms and click **Predict Disease** to begin.")
+
+# ==============================
+# End of App
+# ==============================
