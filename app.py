@@ -88,15 +88,26 @@ if st.button("🔍 Predict Disease"):
         )
 
         for i, (disease, confidence) in enumerate(results, start=1):
+            color = "#00bfa5" if confidence > 70 else "#4dd0e1" if confidence > 40 else "#80deea"
             st.markdown(
                 f"""
                 <div style='background-color:#f0f9f9;
                             border-radius:10px;
                             padding:15px;
-                            margin-bottom:10px;
+                            margin-bottom:12px;
                             box-shadow:0 2px 4px rgba(0,0,0,0.1);'>
                     <h4 style='color:#004d4d; margin:0;'>{i}. {disease}</h4>
-                    <p style='color:#007777; margin:0;'>Confidence: {confidence:.1f}%</p>
+                    <div style='background-color:#e0f2f1; 
+                                border-radius:10px; 
+                                margin-top:8px;
+                                height:15px; 
+                                width:100%;'>
+                        <div style='width:{confidence}%; 
+                                    background:linear-gradient(90deg, {color}, #26a69a); 
+                                    height:100%; 
+                                    border-radius:10px;'></div>
+                    </div>
+                    <p style='color:#007777; margin-top:5px; font-size:15px;'>Confidence: {confidence:.1f}%</p>
                 </div>
                 """, unsafe_allow_html=True
             )
